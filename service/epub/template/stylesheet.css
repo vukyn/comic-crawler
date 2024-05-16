@@ -1,0 +1,148 @@
+@page {
+	margin-bottom: 5pt;
+	margin-top: 5pt;
+}
+.app-amzn-magnify {
+	display: inline-block;
+	height: 100%;
+	width: 100%;
+}
+.calibre {
+	display: block;
+	font-size: 1em;
+	line-height: 1.2;
+	margin: 0 5pt;
+	padding: 0;
+}
+.calibre1 {
+	display: block;
+	text-align: center;
+	top: 0%;
+}
+.calibre2 {
+	height: 1680px;
+	width: 1264px;
+}
+.calibre2-rotated {
+	width: 1680px;
+	height: 1264px;
+}
+.calibre3 {
+	display: block;
+	height: 100%;
+	left: 0;
+	position: absolute;
+	top: 0;
+	width: 100%;
+}
+.calibre4 {
+	display: block;
+	float: left;
+	height: 50%;
+	left: 0;
+	top: 0;
+	width: 49.5%;
+}
+.calibre5 {
+	display: block;
+	float: right;
+	height: 50%;
+	right: 0;
+	top: 0;
+	width: 49.5%;
+}
+.calibre6 {
+	bottom: 0;
+	display: block;
+	float: left;
+	height: 50%;
+	left: 0;
+	width: 49.5%;
+}
+.calibre7 {
+	bottom: 0;
+	display: block;
+	float: right;
+	height: 50%;
+	right: 0;
+	width: 49.5%;
+}
+.calibre8 {
+	height: 2520px;
+	left: 0;
+	position: absolute;
+	top: 0;
+	width: 1896px;
+}
+.calibre8-rotated {
+	width: 2520px;
+	left: 0;
+	position: absolute;
+	top: 0;
+	height: 1896px;
+}
+.calibre9 {
+	height: 2520px;
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 1896px;
+}
+.calibre9-rotated {
+	width: 2520px;
+	position: absolute;
+	right: 0;
+	top: 0;
+	height: 1896px;
+}
+.calibre10 {
+	bottom: 0;
+	height: 2520px;
+	left: 0;
+	position: absolute;
+	width: 1896px;
+}
+.calibre10-rotated {
+	bottom: 0;
+	width: 2520px;
+	left: 0;
+	position: absolute;
+	height: 1896px;
+}
+.calibre11 {
+	bottom: 0;
+	height: 2520px;
+	position: absolute;
+	right: 0;
+	width: 1896px;
+}
+.calibre11-rotated {
+	bottom: 0;
+	width: 2520px;
+	position: absolute;
+	right: 0;
+	height: 1896px;
+}
+.calibre12 {
+	background-color: #000;
+	display: block;
+	font-size: 1em;
+	line-height: 1.2;
+	margin: 0 5pt;
+	padding: 0;
+}
+.pv-p {
+	display: none;
+	height: 100%;
+	position: absolute;
+	top: 0;
+	width: 100%;
+}
+.pv-p1 {
+	background-color: #000;
+	display: none;
+	height: 100%;
+	position: absolute;
+	top: 0;
+	width: 100%;
+}

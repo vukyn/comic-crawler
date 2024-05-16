@@ -7,7 +7,7 @@ import (
 	"github.com/go-pdf/fpdf"
 )
 
-func ImagesToPDF(folderPath string, pdfPath string, pdfName string) error {
+func ImagesToPDF(folderPath string, filePath, fileName string) error {
 	// Read all files in folder
 	files, err := os.ReadDir(folderPath)
 	if err != nil {
@@ -35,14 +35,10 @@ func ImagesToPDF(folderPath string, pdfPath string, pdfName string) error {
 		// w, h := img.Bounds().Dx(), img.Bounds().Dy()
 
 		// Render image to PDF
-		opts := fpdf.ImageOptions{ImageType: "JPG", ReadDpi: true}
+		opts := fpdf.ImageOptions{ImageType: "JPG", ReadDpi: false}
 		pdf.ImageOptions(imgPath, 0, 0, 0, 0, false, opts, 0, "")
 	}
 
-	output := fmt.Sprintf("%s/%s.pdf", pdfPath, pdfName)
-	if err := pdf.OutputFileAndClose(output); err != nil {
-		return err
-	}
-
-	return nil
+	output := fmt.Sprintf("%s/%s.pdf", filePath, fileName)
+	return pdf.OutputFileAndClose(output)
 }

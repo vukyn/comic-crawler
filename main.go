@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"comic-crawler/service"
+	"comic-crawler/service/epub"
 
 	"github.com/gocolly/colly"
 	"github.com/joho/godotenv"
@@ -138,9 +139,16 @@ func main() {
 		// 		fmt.Println(err)
 		// 	}
 		// }
-		if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
+		epubOpt := epub.EpubOption{
+			Title:  "Cậu ma nhà xí Hanako Chap 1",
+			Author: "Unknown",
+		}
+		if err := epub.ImagesToEPUB("out/22960/Chapter 1", "out/22960", "Chapter 1", epubOpt); err != nil {
 			fmt.Println(err)
 		}
+		// if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
+		// 	fmt.Println(err)
+		// }
 	}
 
 	fmt.Printf("Done for %.2fm!", time.Since(timeStart).Minutes())
