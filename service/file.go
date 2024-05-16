@@ -18,25 +18,25 @@ func CreateFilePath(filePath string) error {
 	return err
 }
 
-func OverwriteFolder(folderpath string) error {
+func OverwriteFolder(folderPath string) error {
 	// If the directory exists, remove it
-	if ok, _ := IsFolderExist(folderpath); !ok {
-		err := os.RemoveAll(folderpath)
+	if ok, _ := IsFolderExist(folderPath); !ok {
+		err := os.RemoveAll(folderPath)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Create the directory
-	if err := CreateFilePath(folderpath); err != nil {
+	if err := CreateFilePath(folderPath); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func IsFolderExist(folderpath string) (bool, error) {
-	if _, err := os.Stat(folderpath); os.IsNotExist(err) {
+func IsFolderExist(folderPath string) (bool, error) {
+	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err

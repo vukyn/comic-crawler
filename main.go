@@ -121,7 +121,7 @@ func main() {
 			}
 		}
 
-		// Close pool channel to signal no more URLs to download
+		// Close jobs channel to signal no more URLs to download
 		close(jobs)
 
 		// Wait for all download jobs to finish
@@ -130,7 +130,20 @@ func main() {
 		sleep()
 	}
 
-	fmt.Printf("Done for %.2f!", time.Since(timeStart).Minutes())
+	convertList := strings.Split(os.Getenv("CONVERT"), ",")
+	if len(convertList) > 0 {
+		fmt.Println("Converting images...")
+		// for _, convert := range convertList {
+		// 	if err := service.ConvertImages(convert); err != nil {
+		// 		fmt.Println(err)
+		// 	}
+		// }
+		if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	fmt.Printf("Done for %.2fm!", time.Since(timeStart).Minutes())
 }
 
 type URL struct {
