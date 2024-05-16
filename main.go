@@ -13,6 +13,7 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/joho/godotenv"
+	"github.com/vukyn/kuery/query/v2"
 )
 
 func init() {
@@ -31,6 +32,7 @@ func init() {
 }
 
 func main() {
+	timeStart := time.Now()
 	domain := os.Getenv("DOMAIN")
 	comicId := os.Getenv("COMIC_ID")
 
@@ -57,7 +59,17 @@ func main() {
 	fmt.Printf("Number of workers: %d\n", worker)
 
 	fmt.Println("-----------------------------------")
+	isCrawlAll := os.Getenv("CRAWL_ALL")
+	crawlChapters := strings.Split(os.Getenv("CRAWL_CHAPTERS"), ",")
 	for _, chapter := range chapters {
+		if isCrawlAll == "false" {
+			if isAny := query.AnyFunc(crawlChapters, func(i string) bool {
+				return "Chapter "+i == chapter.Name
+			}); !isAny {
+				fmt.Printf("Skipping chapter %s...\n", chapter.Name)
+				continue
+			}
+		}
 		if ok, err := skipChapter(comicId, chapter); err != nil {
 			fmt.Println(err)
 			continue
@@ -115,12 +127,10 @@ func main() {
 		// Wait for all download jobs to finish
 		wg.Wait()
 
-		sleep := 2 * time.Second
-		fmt.Printf("Sleeping for %v\n", sleep)
-		time.Sleep(sleep)
+		sleep()
 	}
 
-	fmt.Println("Done!")
+	fmt.Printf("Done for %.2f!", time.Since(timeStart).Minutes())
 }
 
 type URL struct {
@@ -136,4 +146,14 @@ func skipChapter(comicId string, chapter service.Chapter) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func sleep() {
+	sleep := os.Getenv("SLEEP")
+	sleepTime, _ := strconv.Atoi(sleep)
+	if sleepTime == 0 {
+		sleepTime = 2
+	}
+	fmt.Printf("Sleeping for %v\n", sleepTime)
+	time.Sleep(time.Duration(sleepTime) * time.Second)
 }
