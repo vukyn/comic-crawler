@@ -11,6 +11,7 @@ import (
 
 	"comic-crawler/service"
 	"comic-crawler/service/crawler"
+	"comic-crawler/service/epub"
 
 	"github.com/gocolly/colly"
 	"github.com/joho/godotenv"
@@ -34,6 +35,12 @@ func init() {
 
 func main() {
 	timeStart := time.Now()
+	// crawl()
+	convert()
+	fmt.Printf("Done for %.2fs!\n", time.Since(timeStart).Seconds())
+}
+
+func crawl() {
 	domain := os.Getenv("DOMAIN")
 	comicId := getComicId(domain)
 
@@ -156,29 +163,68 @@ func main() {
 
 		sleep()
 	}
+}
 
-	// var convertList []string
-	// if os.Getenv("CONVERT") != "" {
-	// 	convertList = strings.Split(os.Getenv("CONVERT"), ",")
-	// 	fmt.Println("Converting images...")
-	// 	// for _, convert := range convertList {
-	// 	// 	if err := service.ConvertImages(convert); err != nil {
-	// 	// 		fmt.Println(err)
-	// 	// 	}
-	// 	// }
-	// 	epubOpt := epub.EpubOption{
-	// 		Title:  "Cậu ma nhà xí Hanako Chap 1",
-	// 		Author: "Unknown",
-	// 	}
-	// 	if err := epub.ImagesToEPUB("out/22960/Chapter 1", "out/22960", "Chapter 1", epubOpt); err != nil {
-	// 		fmt.Println(err)
-	// 	}
-	// 	// if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
-	// 	// 	fmt.Println(err)
-	// 	// }
-	// }
+func convert() {
+	domain := os.Getenv("DOMAIN")
+	convertFormat := os.Getenv("CONVERT_FORMAT")
+	convertComicId := os.Getenv("CONVERT_COMIC_ID")
 
-	fmt.Printf("Done for %.2fm!\n", time.Since(timeStart).Minutes())
+	comicPath := fmt.Sprintf("out/%s/%s", getWebsiteName(domain), convertComicId)
+	files, err := os.ReadDir(comicPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("Comic not found")
+			return
+		}
+		fmt.Println(err)
+		return
+	}
+
+	if convertFormat != "" {
+		fmt.Println("Converting...")
+		convertList := strings.Split(convertFormat, ",")
+
+		titleName := os.Getenv("TITLE")
+		if titleName == "" {
+			titleName = "Title"
+		}
+
+		author := os.Getenv("AUTHOR")
+		if author == "" {
+			author = "Unknown"
+		}
+		
+		wg := sync.WaitGroup{}
+		for _, format := range convertList {
+			switch strings.ToLower(format) {
+			case "pdf":
+			case "epub":
+				wg.Add(len(files))
+				for i := range files {
+					go func(i int) {
+						if !files[i].IsDir() {
+							return
+						}
+						chapterPath := fmt.Sprintf("out/%s/%s/%s", getWebsiteName(domain), convertComicId, files[i].Name())
+						epubOpt := epub.EpubOption{
+							Title:  fmt.Sprintf("%s - %s", titleName, files[i].Name()),
+							Author: author,
+							Cover:  os.Getenv("COVER"),
+						}
+						if err := epub.ImagesToEPUB(chapterPath, comicPath, files[i].Name(), epubOpt); err != nil {
+							fmt.Println(err)
+						}
+						fmt.Println("Converted ", files[i].Name(), " to EPUB...")
+						wg.Done()
+					}(i)
+				}
+				wg.Wait()
+			default:
+			}
+		}
+	}
+
 }
 
 type URL struct {
@@ -205,11 +251,15 @@ func getComicId(domain string) string {
 }
 
 func getFolderPath(domain, comicId, chapterName string) string {
-	var domainName = map[string]string{
+	return fmt.Sprintf("out/%s/%s/%s/", getWebsiteName(domain), comicId, chapterName)
+}
+
+func getWebsiteName(domain string) string {
+	var websiteName = map[string]string{
 		os.Getenv("NETTRUYEN_DOMAIN"): "nettruyen",
 		os.Getenv("QQTRUYEN_DOMAIN"):  "qqtruyen",
 	}
-	return fmt.Sprintf("out/%s/%s/%s/", domainName[domain], comicId, chapterName)
+	return websiteName[domain]
 }
 
 func sleep() {

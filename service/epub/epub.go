@@ -13,10 +13,11 @@ import (
 type EpubOption struct {
 	Title  string
 	Author string
+	Cover  string
 	RTL    bool
 }
 
-func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) error {
+func ImagesToEPUB(folderPath, filePath, fileName string, opt EpubOption) error {
 	// Read all files in folder
 	files, err := os.ReadDir(folderPath)
 	if err != nil {
@@ -60,7 +61,7 @@ func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) 
 	}
 
 	// Add image cover to EPUB
-	coverImg, err := e.AddImage("assets/default_cover.webp", "cover.jpg")
+	coverImg, err := e.AddImage(opt.Cover, "cover.jpg")
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,8 @@ func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) 
 		return err
 	}
 
-	for i, f := range files {
+	// Remove rotated image before write EPUB
+	for _, f := range files {
 		info, err := f.Info()
 		if err != nil {
 			return err // in case of file removed or renamed
@@ -80,6 +82,16 @@ func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) 
 		}
 		if strings.Contains(info.Name(), "_rotated") {
 			os.Remove(fmt.Sprintf("%s/%s", folderPath, info.Name()))
+			continue
+		}
+	}
+
+	for i, f := range files {
+		info, err := f.Info()
+		if err != nil {
+			return err // in case of file removed or renamed
+		}
+		if info.IsDir() {
 			continue
 		}
 
@@ -120,6 +132,30 @@ func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) 
 		}
 	}
 
-	output := fmt.Sprintf("%s/%s.epub", filePath, fileName)
-	return e.Write(output)
+	if err := e.Write(fmt.Sprintf("%s/%s.epub", filePath, fileName)); err != nil {
+		return err
+	}
+
+	// Clean up rotated image
+	files, err = os.ReadDir(folderPath)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		info, err := f.Info()
+		if err != nil {
+			return err // in case of file removed or renamed
+		}
+		if info.IsDir() {
+			continue
+		}
+		if strings.Contains(info.Name(), "_rotated") {
+			if err := os.Remove(fmt.Sprintf("%s/%s", folderPath, info.Name())); err != nil {
+				fmt.Println(err)
+			}
+			continue
+		}
+	}
+
+	return nil
 }
