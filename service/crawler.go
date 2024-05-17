@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"net/url"
+
 	"github.com/gocolly/colly"
 	"github.com/vukyn/kuery/query/v2"
 )
@@ -51,8 +53,14 @@ func nettruyenCallback(c *colly.Collector, imgCollector *Collector) {
 			if link == "" {
 				link = e1.Attr("data-src")
 			}
+			link = processURL(link)
 			fmt.Printf("Link found: %s\n", link)
 			imgCollector.Url = append(imgCollector.Url, link)
 		})
 	})
+}
+
+func processURL(path string) string {
+	u, _ := url.Parse(path)
+	return u.Host + u.Path
 }

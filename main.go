@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"comic-crawler/service"
-	"comic-crawler/service/epub"
 
 	"github.com/gocolly/colly"
 	"github.com/joho/godotenv"
@@ -60,8 +59,29 @@ func main() {
 	fmt.Printf("Number of workers: %d\n", worker)
 
 	fmt.Println("-----------------------------------")
+
 	isCrawlAll := os.Getenv("CRAWL_ALL")
-	crawlChapters := strings.Split(os.Getenv("CRAWL_CHAPTERS"), ",")
+	crawlChaptersEnv := os.Getenv("CRAWL_CHAPTERS")
+	crawlChapters := make([]string, 0)
+	if crawlChaptersEnv != "" {
+		if strings.Contains(crawlChaptersEnv, ",") {
+			crawlChapters = strings.Split(crawlChaptersEnv, ",")
+		} else if strings.Contains(crawlChaptersEnv, "-") {
+			crawlRange := strings.Split(crawlChaptersEnv, "-")
+			start, _ := strconv.Atoi(crawlRange[0])
+			end, _ := strconv.Atoi(crawlRange[1])
+			if start > end {
+				fmt.Println("Invalid range")
+				return
+			}
+			for i := start; i <= end; i++ {
+				crawlChapters = append(crawlChapters, fmt.Sprint(i))
+			}
+		} else {
+			crawlChapters = append(crawlChapters, crawlChaptersEnv)
+		}
+	}
+
 	for _, chapter := range chapters {
 		if isCrawlAll == "false" {
 			if isAny := query.AnyFunc(crawlChapters, func(i string) bool {
@@ -131,25 +151,25 @@ func main() {
 		sleep()
 	}
 
-	convertList := strings.Split(os.Getenv("CONVERT"), ",")
-	if len(convertList) > 0 {
-		fmt.Println("Converting images...")
-		// for _, convert := range convertList {
-		// 	if err := service.ConvertImages(convert); err != nil {
-		// 		fmt.Println(err)
-		// 	}
-		// }
-		epubOpt := epub.EpubOption{
-			Title:  "Cậu ma nhà xí Hanako Chap 1",
-			Author: "Unknown",
-		}
-		if err := epub.ImagesToEPUB("out/22960/Chapter 1", "out/22960", "Chapter 1", epubOpt); err != nil {
-			fmt.Println(err)
-		}
-		// if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
-		// 	fmt.Println(err)
-		// }
-	}
+	// convertList := strings.Split(os.Getenv("CONVERT"), ",")
+	// if len(convertList) > 0 {
+	// 	fmt.Println("Converting images...")
+	// 	// for _, convert := range convertList {
+	// 	// 	if err := service.ConvertImages(convert); err != nil {
+	// 	// 		fmt.Println(err)
+	// 	// 	}
+	// 	// }
+	// 	epubOpt := epub.EpubOption{
+	// 		Title:  "Cậu ma nhà xí Hanako Chap 2",
+	// 		Author: "Unknown",
+	// 	}
+	// 	if err := epub.ImagesToEPUB("out/22960/Chapter 2", "out/22960", "Chapter 2", epubOpt); err != nil {
+	// 		fmt.Println(err)
+	// 	}
+	// 	// if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
+	// 	// 	fmt.Println(err)
+	// 	// }
+	// }
 
 	fmt.Printf("Done for %.2fm!\n", time.Since(timeStart).Minutes())
 }
