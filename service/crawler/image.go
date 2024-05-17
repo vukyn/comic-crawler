@@ -1,7 +1,8 @@
-package service
+package crawler
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/gocolly/colly"
@@ -13,9 +14,9 @@ type Collector struct {
 }
 
 func CrawlImg(c *colly.Collector, domain, url string) []string {
-
 	var crawler = map[string]func(*colly.Collector, *Collector){
-		os.Getenv("NETTRUYEN_DOMAIN"): nettruyenCallback,
+		os.Getenv("NETTRUYEN_DOMAIN"): nettruyenImgCallback,
+		os.Getenv("QQTRUYEN_DOMAIN"):  qqtruyenImgCallback,
 	}
 	callback, ok := crawler[domain]
 	if !ok {
@@ -35,7 +36,7 @@ func CrawlImg(c *colly.Collector, domain, url string) []string {
 	// Start scraping
 	url = "https://" + domain + url
 	if err := c.Visit(url); err != nil {
-		fmt.Println(err)
+		fmt.Println("Colly scraper: ", err)
 	}
 	fmt.Printf("Total link found (%d)\n", len(imgCollector.Url))
 
@@ -44,7 +45,7 @@ func CrawlImg(c *colly.Collector, domain, url string) []string {
 	})
 }
 
-func nettruyenCallback(c *colly.Collector, imgCollector *Collector) {
+func nettruyenImgCallback(c *colly.Collector, imgCollector *Collector) {
 	c.OnHTML("div.page-chapter", func(e *colly.HTMLElement) {
 		e.ForEach("img.lozad", func(_ int, e1 *colly.HTMLElement) {
 			link := e1.Attr("src")
@@ -53,6 +54,21 @@ func nettruyenCallback(c *colly.Collector, imgCollector *Collector) {
 			}
 			fmt.Printf("Link found: %s\n", link)
 			imgCollector.Url = append(imgCollector.Url, link)
+		})
+	})
+}
+
+func qqtruyenImgCallback(c *colly.Collector, imgCollector *Collector) {
+	c.OnHTML("div.chapter_content", func(e *colly.HTMLElement) {
+		e.ForEach("img.lazy", func(_ int, e1 *colly.HTMLElement) {
+			src := e1.Attr("src")
+			if src == "" {
+				src = e1.Attr("data-src")
+			}
+			link, _ := url.Parse(src)
+			link.RawQuery = ""
+			fmt.Printf("Link found: %s\n", link.String())
+			imgCollector.Url = append(imgCollector.Url, link.String())
 		})
 	})
 }

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"comic-crawler/service"
-	"comic-crawler/service/epub"
+	"comic-crawler/service/crawler"
 
 	"github.com/gocolly/colly"
 	"github.com/joho/godotenv"
@@ -35,20 +35,20 @@ func init() {
 func main() {
 	timeStart := time.Now()
 	domain := os.Getenv("DOMAIN")
-	comicId := os.Getenv("COMIC_ID")
-
-	fmt.Println("Trying to get list of chapters...")
-	chapters, err := service.LoadChapters()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	comicId := getComicId(domain)
 
 	// Init crawler
 	fmt.Println("Starting crawler...")
 	c := colly.NewCollector(
 		colly.AllowedDomains(domain, "www."+domain),
 	)
+
+	fmt.Println("Trying to get list of chapters...")
+	chapters, err := crawler.CrawlChapter(c, domain)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// Init downloader
 	fmt.Println("Starting downloader...")
@@ -63,9 +63,9 @@ func main() {
 	isCrawlAll := os.Getenv("CRAWL_ALL")
 	crawlChapters := strings.Split(os.Getenv("CRAWL_CHAPTERS"), ",")
 	for _, chapter := range chapters {
-		if isCrawlAll == "false" {
+		if isCrawlAll == "" || isCrawlAll == "false" {
 			if isAny := query.AnyFunc(crawlChapters, func(i string) bool {
-				return "Chapter "+i == chapter.Name
+				return "Chapter "+i == chapter.Name || "Chương "+i == chapter.Name || i == chapter.Name
 			}); !isAny {
 				fmt.Printf("Skipping chapter %s...\n", chapter.Name)
 				continue
@@ -80,7 +80,7 @@ func main() {
 		}
 
 		fmt.Printf("Crawling chap %v...\n", chapter.Name)
-		urls := service.CrawlImg(c, domain, chapter.Url)
+		urls := crawler.CrawlImg(c, domain, chapter.Url)
 		if len(urls) == 0 {
 			fmt.Println("No images found")
 			continue
@@ -105,7 +105,7 @@ func main() {
 						// Download image
 						filepath := strings.Split(job.Url, "/")
 						dest := fmt.Sprintf("%s%d.%s", folder, job.Id, strings.Split(filepath[len(filepath)-1], ".")[1])
-						if err := service.DownloadImage(workerId, job.Url, dest); err != nil {
+						if err := service.DownloadImage(workerId, job.Url, domain, dest); err != nil {
 							fmt.Println(err)
 						}
 					}
@@ -131,25 +131,26 @@ func main() {
 		sleep()
 	}
 
-	convertList := strings.Split(os.Getenv("CONVERT"), ",")
-	if len(convertList) > 0 {
-		fmt.Println("Converting images...")
-		// for _, convert := range convertList {
-		// 	if err := service.ConvertImages(convert); err != nil {
-		// 		fmt.Println(err)
-		// 	}
-		// }
-		epubOpt := epub.EpubOption{
-			Title:  "Cậu ma nhà xí Hanako Chap 1",
-			Author: "Unknown",
-		}
-		if err := epub.ImagesToEPUB("out/22960/Chapter 1", "out/22960", "Chapter 1", epubOpt); err != nil {
-			fmt.Println(err)
-		}
-		// if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
-		// 	fmt.Println(err)
-		// }
-	}
+	// var convertList []string
+	// if os.Getenv("CONVERT") != "" {
+	// 	convertList = strings.Split(os.Getenv("CONVERT"), ",")
+	// 	fmt.Println("Converting images...")
+	// 	// for _, convert := range convertList {
+	// 	// 	if err := service.ConvertImages(convert); err != nil {
+	// 	// 		fmt.Println(err)
+	// 	// 	}
+	// 	// }
+	// 	epubOpt := epub.EpubOption{
+	// 		Title:  "Cậu ma nhà xí Hanako Chap 1",
+	// 		Author: "Unknown",
+	// 	}
+	// 	if err := epub.ImagesToEPUB("out/22960/Chapter 1", "out/22960", "Chapter 1", epubOpt); err != nil {
+	// 		fmt.Println(err)
+	// 	}
+	// 	// if err := service.ImagesToPDF("out/22960/Chapter 1", "out/22960", "Chapter 1"); err != nil {
+	// 	// 	fmt.Println(err)
+	// 	// }
+	// }
 
 	fmt.Printf("Done for %.2fm!\n", time.Since(timeStart).Minutes())
 }
@@ -159,7 +160,7 @@ type URL struct {
 	Url string
 }
 
-func skipChapter(comicId string, chapter service.Chapter) (bool, error) {
+func skipChapter(comicId string, chapter crawler.Chapter) (bool, error) {
 	folder := fmt.Sprintf("out/%s/%s/", comicId, chapter.Name)
 	if ok, err := service.IsFolderExist(folder); err != nil {
 		return false, err
@@ -167,6 +168,14 @@ func skipChapter(comicId string, chapter service.Chapter) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func getComicId(domain string) string {
+	var comicId = map[string]string{
+		os.Getenv("NETTRUYEN_DOMAIN"): os.Getenv("NETTRUYEN_COMIC_ID"),
+		os.Getenv("QQTRUYEN_DOMAIN"):  os.Getenv("QQTRUYEN_COMIC_ID"),
+	}
+	return comicId[domain]
 }
 
 func sleep() {
