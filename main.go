@@ -151,7 +151,7 @@ func main() {
 		// }
 	}
 
-	fmt.Printf("Done for %.2fm!", time.Since(timeStart).Minutes())
+	fmt.Printf("Done for %.2fm!\n", time.Since(timeStart).Minutes())
 }
 
 type URL struct {

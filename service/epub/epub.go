@@ -13,6 +13,7 @@ import (
 type EpubOption struct {
 	Title  string
 	Author string
+	RTL    bool
 }
 
 func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) error {
@@ -35,10 +36,9 @@ func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) 
 	}
 	e.SetAuthor(opt.Author)
 
-	// Load template cover
-	comicCover, err := os.ReadFile("service/epub/template/comic_cover.html")
-	if err != nil {
-		return err
+	// Set RTL
+	if opt.RTL {
+		e.SetPpd("rtl")
 	}
 
 	// Load template page
@@ -52,21 +52,21 @@ func ImagesToEPUB(folderPath string, filePath, fileName string, opt EpubOption) 
 	if err != nil {
 		return err
 	}
-	coverCSS, err := e.AddCSS("service/epub/template/cover.css", "cover.css")
+
+	// Update cover css
+	coverCSS, err := e.AddCSS("service/epub/template/cover.css", "")
 	if err != nil {
 		return err
 	}
 
 	// Add image cover to EPUB
-	imgCover, err := e.AddImage("assets/default_cover.webp", "cover.jpg")
+	coverImg, err := e.AddImage("assets/default_cover.webp", "cover.jpg")
 	if err != nil {
 		return err
 	}
 
-	// Add cover section to EPUB
-	htmlCover := string(comicCover)
-	htmlCover = strings.ReplaceAll(htmlCover, "[[img]]", imgCover)
-	if _, err := e.AddSection(htmlCover, "Cover", "cover", coverCSS); err != nil {
+	// Add cover to EPUB
+	if err = e.SetCover(coverImg, coverCSS); err != nil {
 		return err
 	}
 
