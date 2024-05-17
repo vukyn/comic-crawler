@@ -48,12 +48,13 @@ func CrawlImg(c *colly.Collector, domain, url string) []string {
 func nettruyenImgCallback(c *colly.Collector, imgCollector *Collector) {
 	c.OnHTML("div.page-chapter", func(e *colly.HTMLElement) {
 		e.ForEach("img.lozad", func(_ int, e1 *colly.HTMLElement) {
-			link := e1.Attr("src")
-			if link == "" {
-				link = e1.Attr("data-src")
+			src := e1.Attr("src")
+			if src == "" {
+				src = e1.Attr("data-src")
 			}
-			fmt.Printf("Link found: %s\n", link)
-			imgCollector.Url = append(imgCollector.Url, link)
+			link, _ := url.Parse(src)
+			fmt.Printf("Link found: %s\n", link.Host+link.Path)
+			imgCollector.Url = append(imgCollector.Url, link.Host+link.Path)
 		})
 	})
 }

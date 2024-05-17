@@ -60,8 +60,29 @@ func main() {
 	fmt.Printf("Number of workers: %d\n", worker)
 
 	fmt.Println("-----------------------------------")
+
 	isCrawlAll := os.Getenv("CRAWL_ALL")
-	crawlChapters := strings.Split(os.Getenv("CRAWL_CHAPTERS"), ",")
+	crawlChaptersEnv := os.Getenv("CRAWL_CHAPTERS")
+	crawlChapters := make([]string, 0)
+	if crawlChaptersEnv != "" {
+		if strings.Contains(crawlChaptersEnv, ",") {
+			crawlChapters = strings.Split(crawlChaptersEnv, ",")
+		} else if strings.Contains(crawlChaptersEnv, "-") {
+			crawlRange := strings.Split(crawlChaptersEnv, "-")
+			start, _ := strconv.Atoi(crawlRange[0])
+			end, _ := strconv.Atoi(crawlRange[1])
+			if start > end {
+				fmt.Println("Invalid range")
+				return
+			}
+			for i := start; i <= end; i++ {
+				crawlChapters = append(crawlChapters, fmt.Sprint(i))
+			}
+		} else {
+			crawlChapters = append(crawlChapters, crawlChaptersEnv)
+		}
+	}
+
 	for _, chapter := range chapters {
 		if isCrawlAll == "" || isCrawlAll == "false" {
 			if isAny := query.AnyFunc(crawlChapters, func(i string) bool {
