@@ -43,6 +43,11 @@ func main() {
 		colly.AllowedDomains(domain, "www."+domain),
 	)
 
+	c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: 1 * time.Second,
+	})
+
 	fmt.Println("Trying to get list of chapters...")
 	chapters, err := crawler.CrawlChapter(c, domain)
 	if err != nil {
@@ -92,7 +97,7 @@ func main() {
 				continue
 			}
 		}
-		if ok, err := skipChapter(comicId, chapter); err != nil {
+		if ok, err := skipChapter(domain, comicId, chapter.Name); err != nil {
 			fmt.Println(err)
 			continue
 		} else if ok {
@@ -110,7 +115,7 @@ func main() {
 		var wg sync.WaitGroup
 		jobs := make(chan URL) // Channel for sending URLs to download jobs
 		wg.Add(len(urls))      // Set the wait group size to the number of URLs
-		folder := fmt.Sprintf("out/%s/%s/", comicId, chapter.Name)
+		folder := getFolderPath(domain, comicId, chapter.Name)
 		fmt.Println("Creating folder ", folder)
 		if err := service.OverwriteFolder(folder); err != nil {
 			fmt.Println(err)
@@ -181,8 +186,8 @@ type URL struct {
 	Url string
 }
 
-func skipChapter(comicId string, chapter crawler.Chapter) (bool, error) {
-	folder := fmt.Sprintf("out/%s/%s/", comicId, chapter.Name)
+func skipChapter(domain, comicId, chapterName string) (bool, error) {
+	folder := getFolderPath(domain, comicId, chapterName)
 	if ok, err := service.IsFolderExist(folder); err != nil {
 		return false, err
 	} else if ok {
@@ -199,12 +204,20 @@ func getComicId(domain string) string {
 	return comicId[domain]
 }
 
+func getFolderPath(domain, comicId, chapterName string) string {
+	var domainName = map[string]string{
+		os.Getenv("NETTRUYEN_DOMAIN"): "nettruyen",
+		os.Getenv("QQTRUYEN_DOMAIN"):  "qqtruyen",
+	}
+	return fmt.Sprintf("out/%s/%s/%s/", domainName[domain], comicId, chapterName)
+}
+
 func sleep() {
 	sleep := os.Getenv("SLEEP")
 	sleepTime, _ := strconv.Atoi(sleep)
 	if sleepTime == 0 {
-		sleepTime = 2
+		sleepTime = 2000
 	}
-	fmt.Printf("Sleeping for %v\n", sleepTime)
-	time.Sleep(time.Duration(sleepTime) * time.Second)
+	fmt.Printf("Sleeping for %vms\n", sleepTime)
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 }
