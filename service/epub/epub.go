@@ -8,6 +8,7 @@ import (
 	"github.com/anthonynsimon/bild/imgio"
 	"github.com/anthonynsimon/bild/transform"
 	gub "github.com/go-shiori/go-epub"
+	"github.com/vukyn/kuery/file"
 	"github.com/vukyn/kuery/log"
 )
 
@@ -133,7 +134,10 @@ func ImagesToEPUB(folderPath, filePath, fileName string, opt EpubOption) error {
 		}
 	}
 
-	if err := e.Write(fmt.Sprintf("%s/%s.epub", filePath, fileName)); err != nil {
+	if err := file.CreateFilePath(fmt.Sprintf("%s/epub/", filePath)); err != nil {
+		return err
+	}
+	if err := e.Write(fmt.Sprintf("%s/epub/%s.epub", filePath, fileName)); err != nil {
 		return err
 	}
 

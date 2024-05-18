@@ -20,7 +20,7 @@ func CreateFilePath(filePath string) error {
 
 func OverwriteFolder(folderPath string) error {
 	// If the directory exists, remove it
-	if ok, _ := IsFolderExist(folderPath); !ok {
+	if ok, _ := IsFolderExist(folderPath); ok {
 		err := os.RemoveAll(folderPath)
 		if err != nil {
 			return err

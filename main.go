@@ -16,6 +16,7 @@ import (
 	"comic-crawler/service/epub"
 
 	"github.com/gocolly/colly"
+	"github.com/vukyn/kuery/file"
 	"github.com/vukyn/kuery/log"
 	"github.com/vukyn/kuery/query/v2"
 )
@@ -24,7 +25,7 @@ func init() {
 	// Init folders
 	folders := []string{"out", "raw"}
 	for _, folder := range folders {
-		if err := service.OverwriteFolder(folder); err != nil {
+		if err := file.CreateFilePath(folder); err != nil {
 			log.Errorf("Failed to create folder %s: %v", folder, err)
 			return
 		}
@@ -42,8 +43,8 @@ func init() {
 
 func main() {
 	timeStart := time.Now()
-	crawl()
-	// convert()
+	// crawl()
+	convert()
 	log.Infof("Done for %.2fs!", time.Since(timeStart).Seconds())
 }
 
