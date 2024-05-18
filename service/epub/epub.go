@@ -8,6 +8,7 @@ import (
 	"github.com/anthonynsimon/bild/imgio"
 	"github.com/anthonynsimon/bild/transform"
 	gub "github.com/go-shiori/go-epub"
+	"github.com/vukyn/kuery/log"
 )
 
 type EpubOption struct {
@@ -151,7 +152,7 @@ func ImagesToEPUB(folderPath, filePath, fileName string, opt EpubOption) error {
 		}
 		if strings.Contains(info.Name(), "_rotated") {
 			if err := os.Remove(fmt.Sprintf("%s/%s", folderPath, info.Name())); err != nil {
-				fmt.Println(err)
+				log.Errorf("Error removing rotated image: %v", err)
 			}
 			continue
 		}

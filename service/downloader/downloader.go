@@ -1,17 +1,20 @@
-package service
+package downloader
 
 import (
 	"bytes"
+	"comic-crawler/env"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/vukyn/kuery/log"
 )
 
-// DownloadImage downloads an image from the given URL and saves it to the specified path
-func DownloadImage(workerId int, url, domain, filepath string) error {
+// DownloadImg downloads an image from the given URL and saves it to the specified path
+func DownloadImg(workerId int, url, domain, filepath string) error {
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
@@ -30,7 +33,7 @@ func DownloadImage(workerId int, url, domain, filepath string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("(Worker %d) Downloading image: %v - Took (%.2fs)\n", workerId, url, time.Since(t).Seconds())
+	log.Infof("(Worker %d) Downloaded image: %v - Took (%.2fs)", workerId, url, time.Since(t).Seconds())
 
 	// Copy data from response to file
 	_, err = io.Copy(out, bytes.NewReader(res))
@@ -39,17 +42,19 @@ func DownloadImage(workerId int, url, domain, filepath string) error {
 
 func getReferer(domain string) string {
 	var referer = map[string]string{
-		os.Getenv("NETTRUYEN_DOMAIN"): os.Getenv("NETTRUYEN_REFERER"),
-		os.Getenv("QQTRUYEN_DOMAIN"):  os.Getenv("QQTRUYEN_REFERER"),
+		env.NettruyenDomain: env.NettruyenReferer,
+		env.QqtruyenDomain:  env.QqtruyenReferer,
 	}
 	return referer[domain]
 }
 
 func makeGet(url string, header map[string]string) ([]byte, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithDeadline(context.TODO(), time.Now().Add(2*time.Second))
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		log.Errorf("Error creating request: %v", err)
 		return nil, err
 	}
 	for key, value := range header {
@@ -58,7 +63,7 @@ func makeGet(url string, header map[string]string) ([]byte, error) {
 
 	data, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Error making request:", err)
+		log.Errorf("Error making request: %v", err)
 		return nil, err
 	}
 	defer data.Body.Close()
@@ -70,7 +75,7 @@ func makeGet(url string, header map[string]string) ([]byte, error) {
 
 	res, err := io.ReadAll(data.Body)
 	if err != nil {
-		fmt.Println("Error reading data:", err)
+		log.Errorf("Error reading response: %v", err)
 		return nil, err
 	}
 

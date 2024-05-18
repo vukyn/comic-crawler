@@ -7,9 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
+	"time"
+
+	"comic-crawler/env"
 
 	"github.com/gocolly/colly"
+	"github.com/vukyn/kuery/log"
 )
 
 type ChapterResponse struct {
@@ -25,19 +28,20 @@ type Chapter struct {
 
 func CrawlChapter(c *colly.Collector, domain string) ([]Chapter, error) {
 	var crawler = map[string]func(*colly.Collector) ([]Chapter, error){
-		os.Getenv("NETTRUYEN_DOMAIN"): nettruyenChapterCallback,
-		os.Getenv("QQTRUYEN_DOMAIN"):  qqtruyenChapterCallback,
+		env.NettruyenDomain: nettruyenChapterCallback,
+		env.QqtruyenDomain:  qqtruyenChapterCallback,
 	}
 	callback, ok := crawler[domain]
 	if !ok {
-		fmt.Println("Domain not supported")
+		log.Errorf("Domain not supported: %s", domain)
 		return nil, fmt.Errorf("Domain not supported")
 	}
 	return callback(c)
 }
 
 func nettruyenChapterCallback(_ *colly.Collector) ([]Chapter, error) {
-	res, err := makeGet(os.Getenv("NETTRUYEN_COMIC_QUERY"))
+	url := fmt.Sprintf("https://www.%s/%s?comicId=%d", env.NettruyenDomain, env.NettruyenChapterQuery, env.ComicId)
+	res, err := makeGet(url)
 	if err != nil {
 		return nil, err
 	}
@@ -45,19 +49,19 @@ func nettruyenChapterCallback(_ *colly.Collector) ([]Chapter, error) {
 	var chapterResponse ChapterResponse
 	err = json.Unmarshal(res, &chapterResponse)
 	if err != nil {
-		fmt.Println("Error unmarshalling data:", err)
+		log.Errorf("Error unmarshalling response: %v", err)
 		return nil, err
 	}
 
 	if !chapterResponse.Success {
-		fmt.Println("Error loading chapters:", string(res))
+		log.Errorf("Error getting chapters: %v", err)
 		return nil, err
 	}
 
 	for _, chapter := range chapterResponse.Chapters {
-		fmt.Printf("Link found: %s\n", chapter.Url)
+		log.Infof("Chapter found: (%s) - %s", chapter.Name, chapter.Url)
 	}
-	fmt.Printf("Total chapter found (%d)\n", len(chapterResponse.Chapters))
+	log.Infof("Total chapter found (%d)", len(chapterResponse.Chapters))
 
 	return chapterResponse.Chapters, nil
 }
@@ -65,7 +69,7 @@ func nettruyenChapterCallback(_ *colly.Collector) ([]Chapter, error) {
 func qqtruyenChapterCallback(c *colly.Collector) ([]Chapter, error) {
 	// Before making a request print "Visiting ..."
 	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting", r.URL.String())
+		log.Infof("Visiting %s", r.URL.String())
 	})
 
 	chapters := make([]Chapter, 0)
@@ -73,7 +77,7 @@ func qqtruyenChapterCallback(c *colly.Collector) ([]Chapter, error) {
 		e.ForEach("div.works-chapter-item", func(i int, chapterItem *colly.HTMLElement) {
 			chapterItem.ForEach("a", func(_ int, e1 *colly.HTMLElement) {
 				link, _ := url.Parse(e1.Attr("href"))
-				fmt.Printf("Link found: %s\n", link.Path)
+				log.Infof("Chapter found: (%s) - %s", e1.Text, link.Path)
 				chapters = append(chapters, Chapter{
 					Id:   i + 1,
 					Name: e1.Text,
@@ -84,34 +88,36 @@ func qqtruyenChapterCallback(c *colly.Collector) ([]Chapter, error) {
 	})
 
 	// Start scraping
-	if err := c.Visit(os.Getenv("QQTRUYEN_COMIC_QUERY")); err != nil {
-		fmt.Println(err)
+	if err := c.Visit(env.QqtruyenChapterQuery); err != nil {
+		log.Errorf("Error visiting: %v", err)
+		return nil, err
 	}
-	fmt.Printf("Total chapter found (%d)\n", len(chapters))
+	log.Infof("Total chapter found (%d)", len(chapters))
 
 	return chapters, nil
 }
 
 func makeGet(url string) ([]byte, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithDeadline(context.TODO(), time.Now().Add(2*time.Second))
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		log.Errorf("Error creating request: %v", err)
 		return nil, err
 	}
 
 	data, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Error making request:", err)
+		log.Errorf("Error making request: %v", err)
 		return nil, err
 	}
 	defer data.Body.Close()
 
 	res, err := io.ReadAll(data.Body)
 	if err != nil {
-		fmt.Println("Error reading data:", err)
+		log.Errorf("Error reading response: %v", err)
 		return nil, err
 	}
-
 	return res, nil
 }

@@ -1,11 +1,11 @@
 package crawler
 
 import (
-	"fmt"
+	"comic-crawler/env"
 	"net/url"
-	"os"
 
 	"github.com/gocolly/colly"
+	"github.com/vukyn/kuery/log"
 	"github.com/vukyn/kuery/query/v2"
 )
 
@@ -15,18 +15,18 @@ type Collector struct {
 
 func CrawlImg(c *colly.Collector, domain, url string) []string {
 	var crawler = map[string]func(*colly.Collector, *Collector){
-		os.Getenv("NETTRUYEN_DOMAIN"): nettruyenImgCallback,
-		os.Getenv("QQTRUYEN_DOMAIN"):  qqtruyenImgCallback,
+		env.NettruyenDomain: nettruyenImgCallback,
+		env.QqtruyenDomain:  qqtruyenImgCallback,
 	}
 	callback, ok := crawler[domain]
 	if !ok {
-		fmt.Println("Domain not supported")
+		log.Errorf("Domain not supported: %s", domain)
 		return nil
 	}
 
 	// Before making a request print "Visiting ..."
 	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting", r.URL.String())
+		log.Infof("Visiting %s", r.URL.String())
 	})
 
 	// Callback
@@ -36,9 +36,10 @@ func CrawlImg(c *colly.Collector, domain, url string) []string {
 	// Start scraping
 	url = "https://" + domain + url
 	if err := c.Visit(url); err != nil {
-		fmt.Println("Colly scraper: ", err)
+		log.Errorf("Error visiting: %v", err)
+		return nil
 	}
-	fmt.Printf("Total link found (%d)\n", len(imgCollector.Url))
+	log.Infof("Total link found (%d)", len(imgCollector.Url))
 
 	return query.Map(imgCollector.Url, func(c string) string {
 		return c
@@ -53,8 +54,8 @@ func nettruyenImgCallback(c *colly.Collector, imgCollector *Collector) {
 				src = e1.Attr("data-src")
 			}
 			link, _ := url.Parse(src)
-			fmt.Printf("Link found: %s\n", link.Host+link.Path)
-			imgCollector.Url = append(imgCollector.Url, link.Host+link.Path)
+			log.Infof("Link found: %s", link.String())
+			imgCollector.Url = append(imgCollector.Url, link.String())
 		})
 	})
 }
@@ -68,7 +69,7 @@ func qqtruyenImgCallback(c *colly.Collector, imgCollector *Collector) {
 			}
 			link, _ := url.Parse(src)
 			link.RawQuery = ""
-			fmt.Printf("Link found: %s\n", link.String())
+			log.Infof("Link found: %s", link.String())
 			imgCollector.Url = append(imgCollector.Url, link.String())
 		})
 	})

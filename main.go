@@ -2,50 +2,57 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"comic-crawler/env"
 	"comic-crawler/service"
 	"comic-crawler/service/crawler"
+	"comic-crawler/service/downloader"
 	"comic-crawler/service/epub"
 
 	"github.com/gocolly/colly"
-	"github.com/joho/godotenv"
+	"github.com/vukyn/kuery/log"
 	"github.com/vukyn/kuery/query/v2"
 )
 
 func init() {
+	// Init folders
 	folders := []string{"out", "raw"}
 	for _, folder := range folders {
 		if err := service.OverwriteFolder(folder); err != nil {
-			fmt.Println(err)
+			log.Errorf("Failed to create folder %s: %v", folder, err)
 			return
 		}
 	}
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	// Init log
+	log.SetPrettyLog()
+
+	// Load env
+	if err := env.Init(); err != nil {
+		log.Errorf("Failed to load env: %v", err)
+		return
 	}
 }
 
 func main() {
 	timeStart := time.Now()
-	// crawl()
-	convert()
-	fmt.Printf("Done for %.2fs!\n", time.Since(timeStart).Seconds())
+	crawl()
+	// convert()
+	log.Infof("Done for %.2fs!", time.Since(timeStart).Seconds())
 }
 
 func crawl() {
-	domain := os.Getenv("DOMAIN")
-	comicId := getComicId(domain)
+	domain := env.Domain
+	comicId := env.ComicId
 
 	// Init crawler
-	fmt.Println("Starting crawler...")
+	log.Infof("Starting crawler...")
 	c := colly.NewCollector(
 		colly.AllowedDomains(domain, "www."+domain),
 	)
@@ -55,26 +62,22 @@ func crawl() {
 		RandomDelay: 1 * time.Second,
 	})
 
-	fmt.Println("Trying to get list of chapters...")
+	log.Infof("Trying to get list of chapters...")
 	chapters, err := crawler.CrawlChapter(c, domain)
 	if err != nil {
-		fmt.Println(err)
+		log.Errorf("Failed to get list of chapters: %v", err)
 		return
 	}
 
 	// Init downloader
-	fmt.Println("Starting downloader...")
-	worker := 1
-	downloadWorker := os.Getenv("DOWNLOAD_WORKER") // Number of workers to download images concurrently
-	if downloadWorker != "" {
-		worker, _ = strconv.Atoi(downloadWorker)
-	}
-	fmt.Printf("Number of workers: %d\n", worker)
+	log.Infof("Starting downloader...")
+	downloadWorker := env.DownloadWorker
+	log.Infof("Number of download workers: %d", downloadWorker)
 
 	fmt.Println("-----------------------------------")
 
-	isCrawlAll := os.Getenv("CRAWL_ALL")
-	crawlChaptersEnv := os.Getenv("CRAWL_CHAPTERS")
+	isCrawlAll := env.CrawlAll
+	crawlChaptersEnv := env.CrawlChapters
 	crawlChapters := make([]string, 0)
 	if crawlChaptersEnv != "" {
 		if strings.Contains(crawlChaptersEnv, ",") {
@@ -84,7 +87,7 @@ func crawl() {
 			start, _ := strconv.Atoi(crawlRange[0])
 			end, _ := strconv.Atoi(crawlRange[1])
 			if start > end {
-				fmt.Println("Invalid range")
+				log.Errorf("Invalid range: %s", crawlChaptersEnv)
 				return
 			}
 			for i := start; i <= end; i++ {
@@ -96,50 +99,51 @@ func crawl() {
 	}
 
 	for _, chapter := range chapters {
-		if isCrawlAll == "" || isCrawlAll == "false" {
+		if !isCrawlAll {
 			if isAny := query.AnyFunc(crawlChapters, func(i string) bool {
 				return "Chapter "+i == chapter.Name || "Chương "+i == chapter.Name || i == chapter.Name
 			}); !isAny {
-				fmt.Printf("Skipping chapter %s...\n", chapter.Name)
+				log.Warnf("Skipping chapter %s...", chapter.Name)
 				continue
 			}
 		}
-		if ok, err := skipChapter(domain, comicId, chapter.Name); err != nil {
-			fmt.Println(err)
+		if ok, err := skipChapter(domain, chapter.Name, comicId); err != nil {
+			log.Errorf("Failed to skip chapter %s: %v", chapter.Name, err)
 			continue
 		} else if ok {
-			fmt.Printf("Chapter %s already exists, skipping...\n", chapter.Name)
+			log.Warnf("Chapter %s already exists, skipping...", chapter.Name)
 			continue
 		}
 
-		fmt.Printf("Crawling chap %v...\n", chapter.Name)
+		log.Infof("Crawling chap %v...", chapter.Name)
 		urls := crawler.CrawlImg(c, domain, chapter.Url)
 		if len(urls) == 0 {
-			fmt.Println("No images found")
+			log.Errorf("No images found")
 			continue
 		}
 
 		var wg sync.WaitGroup
 		jobs := make(chan URL) // Channel for sending URLs to download jobs
 		wg.Add(len(urls))      // Set the wait group size to the number of URLs
-		folder := getFolderPath(domain, comicId, chapter.Name)
-		fmt.Println("Creating folder ", folder)
+		folder := getFolderPath(domain, chapter.Name, comicId)
+		log.Infof("Creating folder %s", folder)
 		if err := service.OverwriteFolder(folder); err != nil {
-			fmt.Println(err)
+			log.Errorf("Failed to overwrite folder %s: %v", folder, err)
 			continue
 		}
 
-		fmt.Println("Downloading images...")
-		for i := 0; i < worker; i++ {
+		log.Infof("Downloading images...")
+		for i := 0; i < downloadWorker; i++ {
 			workerId := i + 1
 			go func(workerId int) {
 				for job := range jobs {
 					if job.Url != "" {
 						// Download image
-						filepath := strings.Split(job.Url, "/")
-						dest := fmt.Sprintf("%s%d.%s", folder, job.Id, strings.Split(filepath[len(filepath)-1], ".")[1])
-						if err := service.DownloadImage(workerId, job.Url, domain, dest); err != nil {
-							fmt.Println(err)
+						dest := fmt.Sprintf("%s%d.jpg", folder, job.Id)
+						if err := downloader.DownloadImg(workerId, job.Url, domain, dest); err != nil {
+							log.Errorf("Failed to download image %s: %v", job.Url, err)
+						} else {
+							log.Infof("Downloaded %s", job.Url)
 						}
 					}
 					wg.Done()
@@ -166,56 +170,52 @@ func crawl() {
 }
 
 func convert() {
-	domain := os.Getenv("DOMAIN")
-	convertFormat := os.Getenv("CONVERT_FORMAT")
-	convertComicId := os.Getenv("CONVERT_COMIC_ID")
+	domain := env.Domain
+	comicId := env.ComicId
+	convertFormat := env.ConvertFormat
 
-	comicPath := fmt.Sprintf("out/%s/%s", getWebsiteName(domain), convertComicId)
+	comicPath := fmt.Sprintf("out/%s/%d", getWebsiteName(domain), comicId)
 	files, err := os.ReadDir(comicPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("Comic not found")
+			log.Errorf("Comic not found")
 			return
 		}
-		fmt.Println(err)
+		log.Errorf("Failed to read comic folder: %v", err)
 		return
 	}
 
 	if convertFormat != "" {
-		fmt.Println("Converting...")
+		log.Infof("Converting...")
 		convertList := strings.Split(convertFormat, ",")
 
-		titleName := os.Getenv("TITLE")
-		if titleName == "" {
-			titleName = "Title"
-		}
-
-		author := os.Getenv("AUTHOR")
-		if author == "" {
-			author = "Unknown"
-		}
-		
 		wg := sync.WaitGroup{}
 		for _, format := range convertList {
-			switch strings.ToLower(format) {
-			case "pdf":
-			case "epub":
+			switch strings.ToUpper(format) {
+			case "PDF":
+			case "EPUB":
 				wg.Add(len(files))
 				for i := range files {
 					go func(i int) {
 						if !files[i].IsDir() {
 							return
 						}
-						chapterPath := fmt.Sprintf("out/%s/%s/%s", getWebsiteName(domain), convertComicId, files[i].Name())
+						chapterPath := fmt.Sprintf("out/%s/%d/%s", getWebsiteName(domain), comicId, files[i].Name())
+						cover := env.Cover
+						if cover == "" {
+							cover = randomCover()
+						}
 						epubOpt := epub.EpubOption{
-							Title:  fmt.Sprintf("%s - %s", titleName, files[i].Name()),
-							Author: author,
-							Cover:  os.Getenv("COVER"),
+							Title:  fmt.Sprintf("%s - %s", env.Title, files[i].Name()),
+							Author: env.Author,
+							Cover:  cover,
 						}
 						if err := epub.ImagesToEPUB(chapterPath, comicPath, files[i].Name(), epubOpt); err != nil {
-							fmt.Println(err)
+							log.Errorf("Failed to convert %s: %v", files[i].Name(), err)
+							wg.Done()
+							return
 						}
-						fmt.Println("Converted ", files[i].Name(), " to EPUB...")
+						log.Infof("Converted %s to EPUB", files[i].Name())
 						wg.Done()
 					}(i)
 				}
@@ -232,8 +232,8 @@ type URL struct {
 	Url string
 }
 
-func skipChapter(domain, comicId, chapterName string) (bool, error) {
-	folder := getFolderPath(domain, comicId, chapterName)
+func skipChapter(domain, chapterName string, comicId int) (bool, error) {
+	folder := getFolderPath(domain, chapterName, comicId)
 	if ok, err := service.IsFolderExist(folder); err != nil {
 		return false, err
 	} else if ok {
@@ -242,32 +242,40 @@ func skipChapter(domain, comicId, chapterName string) (bool, error) {
 	return false, nil
 }
 
-func getComicId(domain string) string {
-	var comicId = map[string]string{
-		os.Getenv("NETTRUYEN_DOMAIN"): os.Getenv("NETTRUYEN_COMIC_ID"),
-		os.Getenv("QQTRUYEN_DOMAIN"):  os.Getenv("QQTRUYEN_COMIC_ID"),
-	}
-	return comicId[domain]
+func getFolderPath(domain, chapterName string, comicId int) string {
+	return fmt.Sprintf("out/%s/%d/%s/", getWebsiteName(domain), comicId, chapterName)
 }
 
-func getFolderPath(domain, comicId, chapterName string) string {
-	return fmt.Sprintf("out/%s/%s/%s/", getWebsiteName(domain), comicId, chapterName)
+func randomCover() string {
+	folderPath := "assets/default"
+	files, err := os.ReadDir(folderPath)
+	if err != nil {
+		log.Errorf("Failed to read default cover folder: %v", err)
+		return ""
+	}
+	imgs := make([]string, 0)
+	for _, file := range files {
+		if !file.IsDir() &&
+			strings.Contains(file.Name(), ".jpg") &&
+			strings.Contains(file.Name(), "default_cover_") {
+			imgs = append(imgs, fmt.Sprintf("%s/%s", folderPath, file.Name()))
+		}
+	}
+
+	s := rand.NewSource(time.Now().Unix())
+	r := rand.New(s)
+	return imgs[r.Intn(len(imgs))]
 }
 
 func getWebsiteName(domain string) string {
 	var websiteName = map[string]string{
-		os.Getenv("NETTRUYEN_DOMAIN"): "nettruyen",
-		os.Getenv("QQTRUYEN_DOMAIN"):  "qqtruyen",
+		env.NettruyenDomain: "nettruyen",
+		env.QqtruyenDomain:  "qqtruyen",
 	}
 	return websiteName[domain]
 }
 
 func sleep() {
-	sleep := os.Getenv("SLEEP")
-	sleepTime, _ := strconv.Atoi(sleep)
-	if sleepTime == 0 {
-		sleepTime = 2000
-	}
-	fmt.Printf("Sleeping for %vms\n", sleepTime)
-	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+	log.Infof("Sleeping for %vms", env.Sleep)
+	time.Sleep(time.Duration(env.Sleep) * time.Millisecond)
 }
