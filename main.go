@@ -198,7 +198,7 @@ func convert() {
 				wg.Add(len(files))
 				for i := range files {
 					go func(i int) {
-						if !files[i].IsDir() {
+						if !validFolderChapter(files[i]) {
 							return
 						}
 						chapterPath := fmt.Sprintf("out/%s/%d/%s", getWebsiteName(domain), comicId, files[i].Name())
@@ -245,6 +245,17 @@ func skipChapter(domain, chapterName string, comicId int) (bool, error) {
 
 func getFolderPath(domain, chapterName string, comicId int) string {
 	return fmt.Sprintf("out/%s/%d/%s/", getWebsiteName(domain), comicId, chapterName)
+}
+
+func validFolderChapter(f os.DirEntry) bool {
+	isFile := !f.IsDir()
+	if isFile ||
+		f.Name() == "epub" ||
+		f.Name() == "pdf" ||
+		f.Name() == "temp" {
+		return false
+	}
+	return true
 }
 
 func randomCover() string {

@@ -10,6 +10,7 @@ import (
 	gub "github.com/go-shiori/go-epub"
 	"github.com/vukyn/kuery/file"
 	"github.com/vukyn/kuery/log"
+	"github.com/vukyn/kuery/query/v2"
 )
 
 type EpubOption struct {
@@ -73,25 +74,13 @@ func ImagesToEPUB(folderPath, filePath, fileName string, opt EpubOption) error {
 		return err
 	}
 
-	// Remove rotated image before write EPUB
-	for _, f := range files {
-		info, err := f.Info()
-		if err != nil {
-			return err // in case of file removed or renamed
-		}
-		if info.IsDir() {
+	for i := range files {
+		info, ok := query.FindFunc(files, func(f os.DirEntry) bool {
+			return f.Name() == fmt.Sprintf("%d.jpg", i+1)
+		})
+		if !ok {
+			log.Warnf("Missing image %d.jpg", i+1)
 			continue
-		}
-		if strings.Contains(info.Name(), "_rotated") {
-			os.Remove(fmt.Sprintf("%s/%s", folderPath, info.Name()))
-			continue
-		}
-	}
-
-	for i, f := range files {
-		info, err := f.Info()
-		if err != nil {
-			return err // in case of file removed or renamed
 		}
 		if info.IsDir() {
 			continue
