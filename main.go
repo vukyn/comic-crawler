@@ -199,6 +199,7 @@ func convert() {
 				for i := range files {
 					go func(i int) {
 						if !validFolderChapter(files[i]) {
+							wg.Done()
 							return
 						}
 						chapterPath := fmt.Sprintf("out/%s/%d/%s", getWebsiteName(domain), comicId, files[i].Name())

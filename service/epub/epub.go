@@ -97,7 +97,7 @@ func ImagesToEPUB(folderPath, filePath, fileName string, opt EpubOption) error {
 		w, h := img.Bounds().Dx(), img.Bounds().Dy()
 		if w > h {
 			isRotated = true
-			img = transform.Rotate(img, -90, nil)
+			img = transform.Rotate(img, -90, &transform.RotationOptions{ResizeBounds: true})
 			imgPath = fmt.Sprintf("%s/%s", folderPath, strings.Split(info.Name(), ".")[0]+"_rotated.jpg")
 			if err := imgio.Save(imgPath, img, imgio.PNGEncoder()); err != nil {
 				return err
